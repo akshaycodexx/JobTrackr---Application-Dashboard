@@ -4,7 +4,8 @@ import DashboardLayout from './components/DashboardLayout'
 import Analytics from './components/pages/Analytics'
 import Applications from './components/pages/Applications'
 import Dashboard from './components/pages/Dashboard'
-import Setting from './components/Setting'
+import Setting from './components/pages/SettingsPage'
+import HeroPage from './components/pages/HeroPage'
 import './App.css'
 function App() {
   return (
@@ -12,7 +13,8 @@ function App() {
       <BrowserRouter>
       <Routes>
           {/* NASTED ROUTES */}
-        <Route path='/' element={<DashboardLayout/>}>
+          <Route path='/' element={<HeroPage/>}/>
+        <Route path='/dashboard' element={<DashboardLayout/>}>
            <Route index element={<Dashboard/>}/>   {/* Diffault page becuse we write index */}
           <Route path='applications' element={<Applications/>}/>
           <Route path='analytics' element={<Analytics/>}/>

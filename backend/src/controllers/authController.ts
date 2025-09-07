@@ -4,7 +4,8 @@ import bcrypt from "bcryptjs";
 import Jwt from "jsonwebtoken";
 import cloudinary from "../config/cloudinary";
 import cookieParser from "cookie-parser";
-
+import dotenv from "dotenv";
+dotenv.config()
 
 
 export const register = async (req:Request , res:Response ):Promise<void>=>{
@@ -33,7 +34,26 @@ export const register = async (req:Request , res:Response ):Promise<void>=>{
             profileUrl:profileUrl
         })
         await newUser.save();
-        res.status(200).json({message:"User Registration !!"});
+
+        const token = Jwt.sign({ id: newUser._id }, process.env.JWT_SECRET as string, { expiresIn: "7d" });
+
+        res.cookie("token", token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production",
+            sameSite: "strict",
+            maxAge: 7 * 24 * 60 * 60 * 1000
+        });
+
+        res.status(201).json({
+            message: "User Registered Successfully !!",
+            token,
+            user: {
+                id: newUser._id,
+                name: newUser.name,
+                email: newUser.email,
+                profileUrl: newUser.profileUrl
+            }
+        });
     } catch (error) {
         res.status(500).json({message:"User Registration Failed !!"});
         console.log("Signup Contraoller failed",error);
@@ -82,6 +102,18 @@ export const login = async (req:Request , res:Response ):Promise<void>=>{
     }
 }
 
+
+export const profile = async(req:any,res:any)=>{
+    try {
+        const user= await User.findById(req.userId).select("name email profileUrl");
+        if(!user){
+            return res.status(404).json({message:"user not found"})
+        }
+        res.json(user);
+    } catch (error) {
+         res.status(500).json({ message: "Server error" });
+    }
+}
 
 
 

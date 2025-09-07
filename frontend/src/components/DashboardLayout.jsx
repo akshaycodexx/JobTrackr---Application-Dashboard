@@ -1,8 +1,31 @@
-import { useState } from 'react'
-import { Outlet, Link } from "react-router-dom";
+import { useEffect, useState } from 'react'
+import { Outlet, Link  } from "react-router-dom";
+import axios from 'axios';
 
 function DashboardLayout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [user,SetUser]=useState(null);
+
+  useEffect(()=>{
+    
+        const fetchProfile=async()=>{
+          const token= localStorage.getItem("token");
+          if(!token){
+            return ;
+          }
+                try {
+                  const response= await axios.get("/api/auth/profile",{
+                    headers:{Authorization:`Bearer ${token}`}
+                  });
+                  SetUser(response.data)
+
+                } catch (error) {
+                  console.log("Error in fetch Profile")
+                }
+        }
+        fetchProfile();
+  },[])
+
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -27,7 +50,7 @@ function DashboardLayout() {
         
         <nav className="flex flex-col gap-2">
           <Link 
-            to="/" 
+            to="/dashboard" 
             className="flex items-center gap-3 p-3 rounded-lg transition-all duration-300 group hover:bg-white/10 hover:-translate-y-0.5"
           >
             <i className="fas fa-chart-pie w-5 text-center transition-transform group-hover:scale-110"></i>
@@ -40,7 +63,7 @@ function DashboardLayout() {
           </Link>
           
           <Link 
-            to="/Applications" 
+            to="applications" 
             className="flex items-center gap-3 p-3 rounded-lg transition-all duration-300 group hover:bg-white/10 hover:-translate-y-0.5"
           >
             <i className="fas fa-file-alt w-5 text-center transition-transform group-hover:scale-110"></i>
@@ -53,7 +76,7 @@ function DashboardLayout() {
           </Link>
           
           <Link 
-            to="/Analytics" 
+            to="analytics" 
             className="flex items-center gap-3 p-3 rounded-lg transition-all duration-300 group hover:bg-white/10 hover:-translate-y-0.5"
           >
             <i className="fas fa-chart-line w-5 text-center transition-transform group-hover:scale-110"></i>
@@ -66,7 +89,7 @@ function DashboardLayout() {
           </Link>
           
           <Link 
-            to="/setting" 
+            to="setting" 
             className="flex items-center gap-3 p-3 rounded-lg transition-all duration-300 group hover:bg-white/10 hover:-translate-y-0.5"
           >
             <i className="fas fa-cog w-5 text-center transition-transform group-hover:scale-110"></i>
@@ -104,12 +127,23 @@ function DashboardLayout() {
               <span className="absolute -top-1 -right-1 bg-purple-500 rounded-full w-3 h-3"></span>
             </div>
             
-            <div className="flex items-center gap-2 cursor-pointer group">
-              <div className="w-8 h-8 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold">
-                JS
+           <div className="flex items-center gap-2 cursor-pointer group">
+              <div className="w-8 h-8 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold overflow-hidden">
+                {user && user.profileUrl ? (
+                  <img
+                    src={user.profileUrl}
+                    alt={user.name}
+                    className="w-full h-full object-cover rounded-full"
+                  />
+                ) : (
+                  <span>{user ? user.name?.charAt(0).toUpperCase() : "?"}</span>
+                )}
               </div>
-              <span className="text-gray-700 group-hover:text-indigo-600 transition-colors">John Smith</span>
+              <span className="text-gray-700 group-hover:text-indigo-600 transition-colors">
+                {user ? user.name : "Guest"}
+              </span>
             </div>
+            
           </div>
         </header>
         

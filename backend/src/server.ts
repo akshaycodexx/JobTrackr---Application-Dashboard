@@ -1,8 +1,8 @@
 import express, { Application, Request, Response } from "express";
 
 import dotenv from 'dotenv'
-import ConnectDB from './src/config/db'
-import authRoutes from './src/routes/authRoutes'
+import ConnectDB from './config/db'
+import authRoutes from './routes/authRoutes'
 
 import cors from 'cors'
 dotenv.config();
