@@ -1,60 +1,146 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  FiSearch, FiSettings, FiPlus, FiFileText, FiCalendar, 
+  FiSearch, FiPlus, FiFileText, FiCalendar, 
   FiEdit, FiTrash2, FiBriefcase, FiTrendingUp, FiX, 
   FiCheckCircle, FiAlertCircle, FiClock, FiAward, FiChevronRight,
-  FiFilter, FiChevronDown
+  FiChevronDown
 } from 'react-icons/fi';
+import axios from 'axios';
 
 const JobApplicationDashboard = () => {
   // --- STATE MANAGEMENT ---
-  const initialApplications = [
-    { id: 1, company: "Vercel", role: "Frontend Engineer", appliedDate: "2025-08-15", status: "Interview", note: "Technical interview with the frontend team lead.", logo: "V" },
-    { id: 2, company: "Linear", role: "Product Designer", appliedDate: "2025-08-02", status: "Offer", note: "Received an amazing offer!", logo: "L" },
-    { id: 3, company: "Stripe", role: "Full-Stack Developer", appliedDate: "2025-07-28", status: "Rejected", note: "Feedback suggests focusing more on system design.", logo: "S" },
-    { id: 4, company: "Figma", role: "UX Researcher", appliedDate: "2025-08-10", status: "Applied", note: "Referred by a friend.", logo: "F" },
-    { id: 5, company: "Notion", role: "Backend Engineer", appliedDate: "2025-07-05", status: "Interview", note: "Completed the final round, awaiting decision.", logo: "N" }
-  ];
-
-  const [applications, setApplications] = useState(initialApplications);
-  const [filteredApps, setFilteredApps] = useState(initialApplications);
-  const [newApplication, setNewApplication] = useState({ company: "", role: "", appliedDate: "", status: "Applied", note: "" });
-  const [resumeFile, setResumeFile] = useState(null);
+  const [applications, setApplications] = useState([]);
+  const [filteredApps, setFilteredApps] = useState([]);
+  const [newApplication, setNewApplication] = useState({ 
+    company: "", 
+    position: "", 
+    appliedDate: "", 
+    status: "Applied", 
+    notes: "" 
+  });
   const [activeFilter, setActiveFilter] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'ascending' });
   const [expandedNoteId, setExpandedNoteId] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [editingApplication, setEditingApplication] = useState(null);
 
   // --- DERIVED STATE & METRICS ---
-  const totalApps = applications.length;
-  const offers = applications.filter(app => app.status === "Offer").length;
-  const rejections = applications.filter(app => app.status === "Rejected").length;
-  const interviews = applications.filter(app => app.status === "Interview").length;
+  const totalApps = applications?.length || 0;
+  const offers = applications?.filter(app => app.status === "Offer").length || 0;
+  const rejections = applications?.filter(app => app.status === "Rejected").length || 0;
+  const interviews = applications?.filter(app => app.status === "Interview").length || 0;
   const successRate = totalApps > 0 ? Math.round((offers / (offers + rejections)) * 100) || 0 : 0;
+
+  // --- API CALLS ---
+  const fetchApplications = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('token');
+      const response = await axios.get('/api/applications', {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      
+      // Ensure we're setting an array, even if response.data is not
+      const appsData = Array.isArray(response.data) ? response.data : [];
+      setApplications(appsData);
+      setFilteredApps(appsData);
+      setError(null);
+    } catch (err) {
+      setError('Failed to fetch applications');
+      console.error('Error fetching applications:', err);
+      // Set empty arrays on error
+      setApplications([]);
+      setFilteredApps([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createApplication = async (applicationData) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post('/api/applications', applicationData, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      return response.data;
+    } catch (err) {
+      throw new Error('Failed to create application');
+    }
+  };
+
+  const updateApplication = async (id, applicationData) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.put(`/api/applications/${id}`, applicationData, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      return response.data.application;
+    } catch (err) {
+      throw new Error('Failed to update application');
+    }
+  };
+
+  const deleteApplication = async (id) => {
+    try {
+      const token = localStorage.getItem('token');
+      await axios.delete(`/api/applications/${id}`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      return true;
+    } catch (err) {
+      throw new Error('Failed to delete application');
+    }
+  };
 
   // --- EFFECTS ---
   useEffect(() => {
-    let filtered = applications;
+    fetchApplications();
+  }, []);
+
+  useEffect(() => {
+    // Ensure applications is always treated as an array
+    let filtered = Array.isArray(applications) ? [...applications] : [];
+    
     if (activeFilter !== "All") {
       filtered = filtered.filter(app => app.status === activeFilter);
     }
+    
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(app => 
-        app.company.toLowerCase().includes(query) || 
-        app.role.toLowerCase().includes(query)
+        app.company?.toLowerCase().includes(query) || 
+        app.position?.toLowerCase().includes(query)
       );
     }
     
     // Apply sorting
     if (sortConfig.key) {
       filtered.sort((a, b) => {
-        if (a[sortConfig.key] < b[sortConfig.key]) {
+        let aValue = a[sortConfig.key];
+        let bValue = b[sortConfig.key];
+        
+        // Handle date sorting
+        if (sortConfig.key === 'appliedDate') {
+          aValue = new Date(aValue);
+          bValue = new Date(bValue);
+        }
+        
+        if (aValue < bValue) {
           return sortConfig.direction === 'ascending' ? -1 : 1;
         }
-        if (a[sortConfig.key] > b[sortConfig.key]) {
+        if (aValue > bValue) {
           return sortConfig.direction === 'ascending' ? 1 : -1;
         }
         return 0;
@@ -65,29 +151,76 @@ const JobApplicationDashboard = () => {
   }, [applications, activeFilter, searchQuery, sortConfig]);
 
   // --- HANDLERS ---
-  const handleInputChange = (e) => setNewApplication({ ...newApplication, [e.target.name]: e.target.value });
-  const handleFileChange = (e) => setResumeFile(e.target.files[0]);
-
-  const addApplication = (e) => {
-    e.preventDefault();
-    if (newApplication.company && newApplication.role && newApplication.appliedDate) {
-      const newApp = { 
-        ...newApplication, 
-        id: Date.now(),
-        logo: newApplication.company.charAt(0).toUpperCase()
-      };
-      setApplications([newApp, ...applications]);
-      setNewApplication({ company: "", role: "", appliedDate: "", status: "Applied", note: "" });
-      setResumeFile(null);
-      setIsModalOpen(false);
+  const handleInputChange = (e) => {
+    if (editingApplication) {
+      setEditingApplication({ ...editingApplication, [e.target.name]: e.target.value });
+    } else {
+      setNewApplication({ ...newApplication, [e.target.name]: e.target.value });
     }
   };
 
-  const deleteApplication = (id) => {
-    setApplications(applications.filter(app => app.id !== id));
+  const handleAddApplication = async (e) => {
+    e.preventDefault();
+    if (newApplication.company && newApplication.position && newApplication.appliedDate) {
+      try {
+        const createdApp = await createApplication(newApplication);
+        // Ensure we're always working with an array
+        setApplications(prev => Array.isArray(prev) ? [createdApp, ...prev] : [createdApp]);
+        setNewApplication({ company: "", position: "", appliedDate: "", status: "Applied", notes: "" });
+        setIsModalOpen(false);
+      } catch (err) {
+        setError(err.message);
+      }
+    }
+  };
+
+  const handleEditApplication = async (e) => {
+    e.preventDefault();
+    if (editingApplication.company && editingApplication.position && editingApplication.appliedDate) {
+      try {
+        const updatedApp = await updateApplication(editingApplication._id, {
+          company: editingApplication.company,
+          position: editingApplication.position,
+          status: editingApplication.status,
+          appliedDate: editingApplication.appliedDate,
+          notes: editingApplication.notes
+        });
+        
+        setApplications(prev => 
+          Array.isArray(prev) 
+            ? prev.map(app => app._id === editingApplication._id ? updatedApp : app) 
+            : [updatedApp]
+        );
+        setEditingApplication(null);
+      } catch (err) {
+        setError(err.message);
+      }
+    }
+  };
+
+  const handleDeleteApplication = async (id) => {
+    if (window.confirm("Are you sure you want to delete this application?")) {
+      try {
+        await deleteApplication(id);
+        setApplications(prev => Array.isArray(prev) ? prev.filter(app => app._id !== id) : []);
+      } catch (err) {
+        setError(err.message);
+      }
+    }
   };
   
-  const updateStatus = (id, status) => setApplications(apps => apps.map(app => app.id === id ? { ...app, status } : app));
+  const handleUpdateStatus = async (id, status) => {
+    try {
+      const updatedApp = await updateApplication(id, { status });
+      setApplications(prev => 
+        Array.isArray(prev) 
+          ? prev.map(app => app._id === id ? updatedApp : app) 
+          : [updatedApp]
+      );
+    } catch (err) {
+      setError(err.message);
+    }
+  };
 
   const handleSort = (key) => {
     let direction = 'ascending';
@@ -103,6 +236,17 @@ const JobApplicationDashboard = () => {
     } else {
       setExpandedNoteId(id);
     }
+  };
+
+  const startEditing = (app) => {
+    setEditingApplication({
+      _id: app._id,
+      company: app.company,
+      position: app.position,
+      status: app.status,
+      appliedDate: app.appliedDate ? new Date(app.appliedDate).toISOString().split('T')[0] : "",
+      notes: app.notes
+    });
   };
 
   // --- UI HELPER CONFIG ---
@@ -232,7 +376,7 @@ const JobApplicationDashboard = () => {
 
   const ApplicationRow = ({ app }) => {
     const { icon: Icon, color, bg, border } = statusConfig[app.status] || {};
-    const isNoteExpanded = expandedNoteId === app.id;
+    const isNoteExpanded = expandedNoteId === app._id;
     
     return (
       <motion.tr 
@@ -250,22 +394,24 @@ const JobApplicationDashboard = () => {
               whileHover={{ rotate: 5, scale: 1.05 }}
               className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center font-bold text-blue-700 text-lg shadow-inner"
             >
-              {app.logo}
+              {app.company?.charAt(0).toUpperCase() || '?'}
             </motion.div>
             <div>
-              <p className="font-semibold text-gray-800">{app.company}</p>
-              <p className="text-sm text-gray-600">{app.role}</p>
+              <p className="font-semibold text-gray-800">{app.company || 'Unknown Company'}</p>
+              <p className="text-sm text-gray-600">{app.position || 'Unknown Role'}</p>
             </div>
           </div>
         </td>
-        <td className="p-4 text-sm text-gray-700">{app.appliedDate}</td>
+        <td className="p-4 text-sm text-gray-700">
+          {app.appliedDate ? new Date(app.appliedDate).toLocaleDateString() : 'N/A'}
+        </td>
         <td className="p-4">
           <motion.div 
             whileHover={{ scale: 1.05 }}
             className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium ${bg} ${color} border ${border}`}
           >
             <Icon />
-            {app.status}
+            {app.status || 'Applied'}
           </motion.div>
         </td>
         <td className="p-4 text-sm text-gray-600 max-w-xs">
@@ -274,11 +420,11 @@ const JobApplicationDashboard = () => {
             animate={{ height: isNoteExpanded ? 'auto' : '1.5em' }}
             transition={{ duration: 0.3 }}
           >
-            {app.note}
+            {app.notes || 'No notes'}
           </motion.div>
-          {app.note && app.note.length > 50 && (
+          {app.notes && app.notes.length > 50 && (
             <button 
-              onClick={() => toggleNoteExpansion(app.id)}
+              onClick={() => toggleNoteExpansion(app._id)}
               className="text-blue-500 text-xs mt-1 hover:underline"
             >
               {isNoteExpanded ? 'Show less' : 'Show more'}
@@ -295,6 +441,7 @@ const JobApplicationDashboard = () => {
             <motion.button 
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.95 }}
+              onClick={() => startEditing(app)}
               className="p-2 rounded-md hover:bg-blue-100 text-gray-500 hover:text-blue-600"
             >
               <FiEdit className="h-4 w-4" />
@@ -302,7 +449,7 @@ const JobApplicationDashboard = () => {
             <motion.button 
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.95 }}
-              onClick={() => deleteApplication(app.id)}
+              onClick={() => handleDeleteApplication(app._id)}
               className="p-2 rounded-md hover:bg-red-100 text-gray-500 hover:text-red-600"
             >
               <FiTrash2 className="h-4 w-4" />
@@ -342,7 +489,7 @@ const JobApplicationDashboard = () => {
                 <FiX />
               </motion.button>
             </div>
-            <form onSubmit={addApplication} className="space-y-4">
+            <form onSubmit={handleAddApplication} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <motion.input 
                   whileFocus={{ scale: 1.02 }}
@@ -350,14 +497,16 @@ const JobApplicationDashboard = () => {
                   value={newApplication.company} 
                   onChange={handleInputChange} 
                   placeholder="Company Name" 
+                  required
                   className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-2 text-gray-800 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
                 />
                 <motion.input 
                   whileFocus={{ scale: 1.02 }}
-                  name="role" 
-                  value={newApplication.role} 
+                  name="position" 
+                  value={newApplication.position} 
                   onChange={handleInputChange} 
                   placeholder="Role / Position" 
+                  required
                   className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-2 text-gray-800 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
                 />
               </div>
@@ -368,6 +517,7 @@ const JobApplicationDashboard = () => {
                   name="appliedDate" 
                   value={newApplication.appliedDate} 
                   onChange={handleInputChange} 
+                  required
                   className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-2 text-gray-800 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
                 />
                 <motion.select 
@@ -382,28 +532,13 @@ const JobApplicationDashboard = () => {
               </div>
               <motion.textarea 
                 whileFocus={{ scale: 1.01 }}
-                name="note" 
-                value={newApplication.note} 
+                name="notes" 
+                value={newApplication.notes} 
                 onChange={handleInputChange} 
                 placeholder="Add a note..." 
                 rows="3" 
                 className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2 text-gray-800 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
               />
-              <div>
-                <motion.label 
-                  whileHover={{ scale: 1.01 }}
-                  whileTap={{ scale: 0.99 }}
-                  htmlFor="resume-upload" 
-                  className="w-full text-center cursor-pointer bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg p-6 hover:border-blue-500 hover:bg-blue-50 transition-colors block"
-                >
-                  <FiFileText className="mx-auto h-8 w-8 text-gray-400 mb-2" />
-                  <span className="text-sm font-semibold text-blue-500">
-                    {resumeFile ? resumeFile.name : 'Upload Resume (Optional)'}
-                  </span>
-                  <p className="text-xs text-gray-500 mt-1">PDF, DOCX up to 5MB</p>
-                </motion.label>
-                <input id="resume-upload" type="file" onChange={handleFileChange} className="hidden" />
-              </div>
               <motion.button 
                 whileHover={{ 
                   scale: 1.02, 
@@ -422,11 +557,137 @@ const JobApplicationDashboard = () => {
     </AnimatePresence>
   );
 
+  const EditApplicationModal = () => (
+    <AnimatePresence>
+      {editingApplication && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={() => setEditingApplication(null)}
+          className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        >
+          <motion.div
+            variants={modalVariants}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-lg bg-white border border-gray-200 rounded-2xl shadow-xl p-8"
+          >
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-gray-800">Edit Application</h2>
+              <motion.button 
+                whileHover={{ rotate: 90, scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+                onClick={() => setEditingApplication(null)}
+                className="p-2 rounded-full hover:bg-gray-100 text-gray-500"
+              >
+                <FiX />
+              </motion.button>
+            </div>
+            <form onSubmit={handleEditApplication} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <motion.input 
+                  whileFocus={{ scale: 1.02 }}
+                  name="company" 
+                  value={editingApplication.company} 
+                  onChange={handleInputChange} 
+                  placeholder="Company Name" 
+                  required
+                  className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-2 text-gray-800 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
+                />
+                <motion.input 
+                  whileFocus={{ scale: 1.02 }}
+                  name="position" 
+                  value={editingApplication.position} 
+                  onChange={handleInputChange} 
+                  placeholder="Role / Position" 
+                  required
+                  className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-2 text-gray-800 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
+                />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <motion.input 
+                  whileFocus={{ scale: 1.02 }}
+                  type="date" 
+                  name="appliedDate" 
+                  value={editingApplication.appliedDate} 
+                  onChange={handleInputChange} 
+                  required
+                  className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-2 text-gray-800 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
+                />
+                <motion.select 
+                  whileFocus={{ scale: 1.02 }}
+                  name="status" 
+                  value={editingApplication.status} 
+                  onChange={handleInputChange} 
+                  className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  {Object.keys(statusConfig).map(s => <option key={s} value={s}>{s}</option>)}
+                </motion.select>
+              </div>
+              <motion.textarea 
+                whileFocus={{ scale: 1.01 }}
+                name="notes" 
+                value={editingApplication.notes} 
+                onChange={handleInputChange} 
+                placeholder="Add a note..." 
+                rows="3" 
+                className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2 text-gray-800 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
+              />
+              <motion.button 
+                whileHover={{ 
+                  scale: 1.02, 
+                  boxShadow: "0 5px 15px rgba(59, 130, 246, 0.4)" 
+                }}
+                whileTap={{ scale: 0.98 }}
+                type="submit" 
+                className="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition-all duration-300 shadow-md flex items-center justify-center gap-2"
+              >
+                Update Application <FiChevronRight/>
+              </motion.button>
+            </form>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading applications...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <FiAlertCircle className="h-12 w-12 text-red-500 mx-auto" />
+          <p className="mt-4 text-gray-600">{error}</p>
+          <button 
+            onClick={fetchApplications}
+            className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 text-gray-700 font-sans">
       <div className="max-w-7xl mx-auto p-4 md:p-8">
         
         <AddApplicationModal />
+        <EditApplicationModal />
 
         {/* Header */}
         <motion.header 
@@ -507,7 +768,7 @@ const JobApplicationDashboard = () => {
                     {filter} 
                     {filter !== "All" && (
                       <span className="ml-1 text-xs">
-                        ({applications.filter(app => app.status === filter).length})
+                        ({applications?.filter(app => app.status === filter).length || 0})
                       </span>
                     )}
                   </span>
@@ -546,7 +807,7 @@ const JobApplicationDashboard = () => {
                 </thead>
                 <tbody>
                   <AnimatePresence>
-                    {filteredApps.map(app => <ApplicationRow key={app.id} app={app} />)}
+                    {filteredApps.map(app => <ApplicationRow key={app._id || app.id || Math.random()} app={app} />)}
                   </AnimatePresence>
                 </tbody>
               </table>

@@ -3,7 +3,7 @@ import mongoose,{Document,Schema} from "mongoose";
 
 export interface IApplication extends Document{
     company:string,
-    role:string,
+    position:string,
     status:"Applied" | "Interview" | "Offer" | "Rejected",
     appliedDate:Date,
     notes?:string,
@@ -15,7 +15,7 @@ const applicationSchema=new Schema<IApplication>({
         type:String,
         required:[true,"Company Name is required"]
     },
-    role:{
+    position:{
         type:String,
         required:[true,"Role is required"]
     },
@@ -40,57 +40,4 @@ const applicationSchema=new Schema<IApplication>({
 },{timestamps:true})
 
 export default mongoose.model<IApplication>("Application",applicationSchema)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

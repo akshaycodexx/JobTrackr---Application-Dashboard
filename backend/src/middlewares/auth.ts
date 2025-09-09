@@ -9,7 +9,8 @@ const authMiddleware = ( req: AuthRequest,res: Response,next: NextFunction)=>{
     const authHeader = req.headers.authorization;
 
     if(!authHeader){
-        return res.status(401).json({nessage:"No token provided"});
+        return res.status(401).json({ message:"No token provided" });
+
     }
 
     const token=authHeader.split(" ")[1];
