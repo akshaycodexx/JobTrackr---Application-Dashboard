@@ -1,24 +1,90 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
+import axios from 'axios';
 
 function Dashboard() {
-  // Sample initial data
-  const initialApplications = [
-    { id: 1, company: "Google", role: "Frontend Developer", appliedDate: "2023-05-15", status: "Interview", note: "Technical interview scheduled", resume: null },
-    { id: 2, company: "Amazon", role: "Product Manager", appliedDate: "2023-06-02", status: "Applied", note: "Waiting for response", resume: null },
-    { id: 3, company: "Microsoft", role: "UX Designer", appliedDate: "2023-05-28", status: "Rejected", note: "Not enough experience", resume: null },
-    { id: 4, company: "Apple", role: "iOS Developer", appliedDate: "2023-06-10", status: "Offer", note: "Received offer letter", resume: null },
-    { id: 5, company: "Netflix", role: "UI Engineer", appliedDate: "2023-06-05", status: "Interview", note: "Final round with design team", resume: null }
-  ];
-
   // State management
-  const [applications, setApplications] = useState(initialApplications);
+  const [applications, setApplications] = useState([]);
   const [newApplication, setNewApplication] = useState({
-    company: "", role: "", appliedDate: "", status: "Applied", note: "", resume: null
+    company: "", position: "", appliedDate: "", status: "Applied", notes: "", resume: null
   });
   const [resumeName, setResumeName] = useState("");
   const [activeFilter, setActiveFilter] = useState("All");
+  const [loading, setLoading] = useState(true);
+
+  // API base URL - update this with your actual API endpoint
+  const API_BASE_URL = 'http://localhost:5000/api/applications';
+
+  // Fetch applications on component mount
+  useEffect(() => {
+    getApplications();
+  }, []);
+
+  // API call functions
+  const getApplications = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('token');
+      const response = await axios.get(API_BASE_URL, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      setApplications(response.data);
+    } catch (error) {
+      console.error('Error fetching applications:', error);
+      toast.error('Failed to fetch applications');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createApplication = async (applicationData) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post(API_BASE_URL, applicationData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error creating application:', error);
+      throw error;
+    }
+  };
+
+  const updateApplication = async (id, updates) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.put(`${API_BASE_URL}/${id}`, updates, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error updating application:', error);
+      throw error;
+    }
+  };
+
+  const deleteApplication = async (id) => {
+    try {
+      const token = localStorage.getItem('token');
+      await axios.delete(`${API_BASE_URL}/${id}`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+    } catch (error) {
+      console.error('Error deleting application:', error);
+      throw error;
+    }
+  };
 
   // Calculate metrics
   const totalApplicants = applications.length;
@@ -47,28 +113,42 @@ function Dashboard() {
     }
   };
 
-  const addApplication = () => {
-    if (newApplication.company && newApplication.role && newApplication.appliedDate) {
-      const newApp = { ...newApplication, id: Date.now() };
-      setApplications([...applications, newApp]);
-      setNewApplication({ company: "", role: "", appliedDate: "", status: "Applied", note: "", resume: null });
-      setResumeName("");
-      toast.success('Application added successfully!');
+  const addApplication = async () => {
+    if (newApplication.company && newApplication.position && newApplication.appliedDate) {
+      try {
+        const createdApp = await createApplication(newApplication);
+        setApplications([...applications, createdApp]);
+        setNewApplication({ company: "", position: "", appliedDate: "", status: "Applied", notes: "", resume: null });
+        setResumeName("");
+        toast.success('Application added successfully!');
+      } catch (error) {
+        toast.error('Failed to add application');
+      }
     } else {
       toast.error('Please fill in all required fields.');
     }
   };
 
-  const deleteApplication = (id) => {
-    setApplications(applications.filter(app => app.id !== id));
-    toast.error('Application deleted.');
+  const handleDeleteApplication = async (id) => {
+    try {
+      await deleteApplication(id);
+      setApplications(applications.filter(app => app._id !== id));
+      toast.error('Application deleted.');
+    } catch (error) {
+      toast.error('Failed to delete application');
+    }
   };
   
-  const handleStatusUpdate = (id, newStatus) => {
-    setApplications(applications.map(app => 
-      app.id === id ? { ...app, status: newStatus } : app
-    ));
-    toast.success('Status updated!');
+  const handleStatusUpdate = async (id, newStatus) => {
+    try {
+      await updateApplication(id, { status: newStatus });
+      setApplications(applications.map(app => 
+        app._id === id ? { ...app, status: newStatus } : app
+      ));
+      toast.success('Status updated!');
+    } catch (error) {
+      toast.error('Failed to update status');
+    }
   };
 
   // --- Helper Functions ---
@@ -90,6 +170,16 @@ function Dashboard() {
       case "Applied": return "📤";
       default: return "📝";
     }
+  };
+
+  // Format date for display
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
   };
 
   // Animation variants
@@ -303,30 +393,30 @@ function Dashboard() {
               </div>
               
               <div>
-                <label htmlFor="role" className="block text-base font-medium text-slate-700 mb-3">Role</label>
-                <input type="text" id="role" name="role" value={newApplication.role} onChange={handleInputChange} className="w-full px-5 py-3 text-base border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="e.g., Frontend Developer" />
+                <label htmlFor="position" className="block text-base font-medium text-slate-700 mb-3">Position</label>
+                <input type="text" id="position" name="position" value={newApplication.position} onChange={handleInputChange} className="w-full px-5 py-3 text-base border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="e.g., Frontend Developer" />
               </div>
               
               <div className="grid grid-cols-2 gap-5">
                 <div>
-                  <label htmlFor="applied-date" className="block text-base font-medium text-slate-700 mb-3">Applied Date</label>
-                  <input type="date" id="applied-date" name="appliedDate" value={newApplication.appliedDate} onChange={handleInputChange} className="w-full px-5 py-3 text-base border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                  <label htmlFor="appliedDate" className="block text-base font-medium text-slate-700 mb-3">Applied Date</label>
+                  <input type="date" id="appliedDate" name="appliedDate" value={newApplication.appliedDate} onChange={handleInputChange} className="w-full px-5 py-3 text-base text-black border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
                 </div>
                 
                 <div>
                   <label htmlFor="status" className="block text-base font-medium text-slate-700 mb-3">Status</label>
-                  <select id="status" name="status" value={newApplication.status} onChange={handleInputChange} className="w-full px-5 py-3 text-base border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                    <option value="Applied">Applied</option>
-                    <option value="Interview">Interview</option>
-                    <option value="Offer">Offer</option>
-                    <option value="Rejected">Rejected</option>
+                  <select id="status" name="status" value={newApplication.status} onChange={handleInputChange} className="w-full px-5 py-3 text-base text-black border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    <option value="Applied" className=" text-black">Applied</option>
+                    <option value="Interview"className=" text-black">Interview</option>
+                    <option value="Offer"className=" text-black">Offer</option>
+                    <option value="Rejected"className=" text-black">Rejected</option>
                   </select>
                 </div>
               </div>
               
               <div>
-                <label htmlFor="note" className="block text-base font-medium text-slate-700 mb-3">Notes</label>
-                <textarea id="note" name="note" value={newApplication.note} onChange={handleInputChange} rows="3" className="w-full px-5 py-3 text-base border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="e.g., Spoke with HR, waiting for technical round..."></textarea>
+                <label htmlFor="notes" className="block text-base font-medium text-slate-700 mb-3">Notes</label>
+                <textarea id="notes" name="notes" value={newApplication.notes} onChange={handleInputChange} rows="3" className="w-full px-5 py-3 text-base text-black border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="e.g., Spoke with HR, waiting for technical round..."></textarea>
               </div>
               
               <div>
@@ -374,87 +464,93 @@ function Dashboard() {
               </div>
             </div>
             
-            <div className="overflow-x-auto">
-              <table className="w-full text-base">
-                <thead className="text-left text-slate-600 uppercase text-sm">
-                  <tr className="border-b border-slate-200">
-                    <th className="py-4 px-5 font-medium">Company</th>
-                    <th className="py-4 px-5 font-medium">Role</th>
-                    <th className="py-4 px-5 font-medium">Date</th>
-                    <th className="py-4 px-5 font-medium">Status</th>
-                    <th className="py-4 px-5 font-medium text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200">
-                  <AnimatePresence>
-                    {filteredApplications.length > 0 ? filteredApplications.map(app => (
-                      <motion.tr 
-                        key={app.id} 
-                        layout
-                        variants={itemVariants}
-                        initial="hidden"
-                        animate="visible"
-                        exit="exit"
-                        className="hover:bg-slate-50/50"
-                      >
-                        <td className="py-5 px-5">
-                          <div className="flex items-center">
-                            <div className="flex-shrink-0 h-12 w-12 bg-slate-100 rounded-lg flex items-center justify-center mr-4">
-                              <span className="font-semibold text-slate-700 text-lg">{app.company.charAt(0)}</span>
+            {loading ? (
+              <div className="flex justify-center items-center py-16">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-base">
+                  <thead className="text-left text-slate-600 uppercase text-sm">
+                    <tr className="border-b border-slate-200">
+                      <th className="py-4 px-5 font-medium">Company</th>
+                      <th className="py-4 px-5 font-medium">Position</th>
+                      <th className="py-4 px-5 font-medium">Date</th>
+                      <th className="py-4 px-5 font-medium">Status</th>
+                      <th className="py-4 px-5 font-medium text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200">
+                    <AnimatePresence>
+                      {filteredApplications.length > 0 ? filteredApplications.map(app => (
+                        <motion.tr 
+                          key={app._id} 
+                          layout
+                          variants={itemVariants}
+                          initial="hidden"
+                          animate="visible"
+                          exit="exit"
+                          className="hover:bg-slate-50/50"
+                        >
+                          <td className="py-5 px-5">
+                            <div className="flex items-center">
+                              <div className="flex-shrink-0 h-12 w-12 bg-slate-100 rounded-lg flex items-center justify-center mr-4">
+                                <span className="font-semibold text-slate-700 text-lg">{app.company.charAt(0)}</span>
+                              </div>
+                              <div>
+                                <div className="font-medium text-slate-900 text-lg">{app.company}</div>
+                                <div className="text-sm text-slate-500 mt-1 line-clamp-1">{app.notes}</div>
+                              </div>
                             </div>
-                            <div>
-                              <div className="font-medium text-slate-900 text-lg">{app.company}</div>
-                              <div className="text-sm text-slate-500 mt-1 line-clamp-1">{app.note}</div>
+                          </td>
+                          <td className="py-5 px-5 text-slate-700 text-lg">{app.position}</td>
+                          <td className="py-5 px-5 text-slate-700 text-lg">{formatDate(app.appliedDate)}</td>
+                          <td className="py-5 px-5">
+                            <div className="flex items-center">
+                              <span className="mr-3 text-xl">{getStatusIcon(app.status)}</span>
+                              <select 
+                                value={app.status}
+                                onChange={(e) => handleStatusUpdate(app._id, e.target.value)}
+                                className={`text-sm py-2 pl-3 pr-10 rounded-full focus:outline-none focus:ring-1 focus:ring-white focus:ring-opacity-50 ${getStatusClass(app.status)}`}
+                              >
+                                <option value="Applied">Applied</option>
+                                <option value="Interview">Interview</option>
+                                <option value="Offer">Offer</option>
+                                <option value="Rejected">Rejected</option>
+                              </select>
                             </div>
-                          </div>
-                        </td>
-                        <td className="py-5 px-5 text-slate-700 text-lg">{app.role}</td>
-                        <td className="py-5 px-5 text-slate-700 text-lg">{app.appliedDate}</td>
-                        <td className="py-5 px-5">
-                          <div className="flex items-center">
-                            <span className="mr-3 text-xl">{getStatusIcon(app.status)}</span>
-                            <select 
-                              value={app.status}
-                              onChange={(e) => handleStatusUpdate(app.id, e.target.value)}
-                              className={`text-sm py-2 pl-3 pr-10 rounded-full focus:outline-none focus:ring-1 focus:ring-white focus:ring-opacity-50 ${getStatusClass(app.status)}`}
-                            >
-                              <option value="Applied">Applied</option>
-                              <option value="Interview">Interview</option>
-                              <option value="Offer">Offer</option>
-                              <option value="Rejected">Rejected</option>
-                            </select>
-                          </div>
-                        </td>
-                        <td className="py-5 px-5">
-                          <div className="flex justify-end items-center space-x-3">
-                            <button className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors duration-200">
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                              </svg>
-                            </button>
-                            <button onClick={() => deleteApplication(app.id)} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors duration-200">
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                              </svg>
-                            </button>
-                          </div>
-                        </td>
-                      </motion.tr>
-                    )) : (
-                      <tr>
-                        <td colSpan="5" className="text-center py-16 text-slate-400">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mx-auto text-slate-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                          </svg>
-                          <p className="text-lg">No applications found.</p>
-                          <p className="text-base mt-2">Start by adding your first job application!</p>
-                        </td>
-                      </tr>
-                    )}
-                  </AnimatePresence>
-                </tbody>
-              </table>
-            </div>
+                          </td>
+                          <td className="py-5 px-5">
+                            <div className="flex justify-end items-center space-x-3">
+                              <button className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors duration-200">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                </svg>
+                              </button>
+                              <button onClick={() => handleDeleteApplication(app._id)} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors duration-200">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              </button>
+                            </div>
+                          </td>
+                        </motion.tr>
+                      )) : (
+                        <tr>
+                          <td colSpan="5" className="text-center py-16 text-slate-400">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mx-auto text-slate-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                            </svg>
+                            <p className="text-lg">No applications found.</p>
+                            <p className="text-base mt-2">Start by adding your first job application!</p>
+                          </td>
+                        </tr>
+                      )}
+                    </AnimatePresence>
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       </div>
