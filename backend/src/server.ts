@@ -11,10 +11,24 @@ ConnectDB();
 const app:Application=express();
 app.use(express.json());
 
+const allowedOrigins = [
+  'http://localhost:5173', // dev
+  'https://job-track-pi.vercel.app' // production frontend
+];
+
 app.use(cors({
-  origin: "https://jobtrackr-backend-rkvx.onrender.com/api", 
-  credentials: true
+  origin: function(origin, callback){
+    // allow requests with no origin like Postman
+    if(!origin) return callback(null, true);
+    if(allowedOrigins.indexOf(origin) === -1){
+      const msg = `The CORS policy for this site does not allow access from the specified Origin.`;
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  },
+  credentials: true // allow cookies
 }));
+
 
 app.use("/api/auth",authRoutes);
 app.use("/api/applications",appllicationRoutes);
