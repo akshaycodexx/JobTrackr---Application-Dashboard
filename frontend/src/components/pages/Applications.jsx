@@ -7,6 +7,7 @@ import {
   FiChevronDown
 } from 'react-icons/fi';
 import axios from 'axios';
+const API_URL = import.meta.env.VITE_API_URL;
 
 const JobApplicationDashboard = () => {
   // --- STATE MANAGEMENT ---
@@ -40,7 +41,7 @@ const JobApplicationDashboard = () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      const response = await axios.get('/api/applications', {
+      const response = await axios.get(`${API_URL}/api/applications`, {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -65,7 +66,7 @@ const JobApplicationDashboard = () => {
   const createApplication = async (applicationData) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.post('/api/applications', applicationData, {
+      const response = await axios.post(`${API_URL}/api/applications`, applicationData, {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -79,7 +80,7 @@ const JobApplicationDashboard = () => {
   const updateApplication = async (id, applicationData) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.put(`/api/applications/${id}`, applicationData, {
+      const response = await axios.put(`${API_URL}/api/applications/${id}`, applicationData, {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -93,7 +94,7 @@ const JobApplicationDashboard = () => {
   const deleteApplication = async (id) => {
     try {
       const token = localStorage.getItem('token');
-      await axios.delete(`/api/applications/${id}`, {
+      await axios.delete(`${API_URL}/api/applications/${id}`, {
         headers: {
           Authorization: `Bearer ${token}`
         }

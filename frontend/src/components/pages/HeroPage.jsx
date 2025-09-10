@@ -5,6 +5,7 @@ import { FiBriefcase, FiUser, FiLock, FiMail, FiArrowRight, FiAward, FiBarChart2
 import axios from 'axios';
 import { Toaster,toast } from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
+const API_URL = import.meta.env.VITE_API_URL;
 
 
 const HeroPage = () => {
@@ -61,7 +62,7 @@ const HeroPage = () => {
     try {
         if(isLogin){
             // login api
-            const res=await axios.post("/api/auth/login",{
+            const res=await axios.post(`${API_URL}/api/auth/login`,{
                 email:formData.email,
                 password:formData.password
             },{withCredentials:true})
@@ -79,7 +80,7 @@ const HeroPage = () => {
                 signupData.append("profilePic",formData.profilePic)
             }
 
-            const res= await axios.post("/api/auth/signup",signupData,{
+            const res= await axios.post(`${API_URL}/api/auth/signup`,signupData,{
                 withCredentials:true,
                 headers:{"Content-Type":"multipart/form-data"}
             })

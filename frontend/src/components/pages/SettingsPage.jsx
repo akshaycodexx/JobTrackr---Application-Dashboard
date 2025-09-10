@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { Toaster, toast } from 'react-hot-toast';
+const API_URL = import.meta.env.VITE_API_URL;
+
 
 const SettingsPage = () => {
   const navigate = useNavigate();
@@ -23,7 +25,7 @@ const SettingsPage = () => {
       }
       
       try {
-        const response = await axios.get("/api/auth/profile", {
+        const response = await axios.get(`${API_URL}/api/auth/profile`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         setUser(response.data);

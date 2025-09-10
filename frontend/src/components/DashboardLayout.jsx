@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Outlet, Link  } from "react-router-dom";
 import axios from 'axios';
-
+const API_URL = import.meta.env.VITE_API_URL;
 function DashboardLayout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [user,SetUser]=useState(null);
@@ -14,7 +14,7 @@ function DashboardLayout() {
             return ;
           }
                 try {
-                  const response= await axios.get("/api/auth/profile",{
+                  const response= await axios.get(`${API_URL}/api/auth/profile`,{
                     headers:{Authorization:`Bearer ${token}`}
                   });
                   SetUser(response.data)

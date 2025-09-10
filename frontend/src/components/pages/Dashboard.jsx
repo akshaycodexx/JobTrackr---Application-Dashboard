@@ -14,7 +14,8 @@ function Dashboard() {
   const [loading, setLoading] = useState(true);
 
   // API base URL - update this with your actual API endpoint
-  const API_BASE_URL = 'http://localhost:5000/api/applications';
+  const API_URL = import.meta.env.VITE_API_URL;
+  const API_BASE_URL = `${API_URL}/api/applications`;
 
   // Fetch applications on component mount
   useEffect(() => {
